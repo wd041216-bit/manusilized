@@ -71,8 +71,9 @@ fi
 
 # Copy patched files
 echo "✨ Copying patched files..."
-cp ./patches/ollama-stream.ts "$OPENCLAW_PATH/src/agents/ollama-stream.ts"
-cp ./patches/ollama-models.ts "$OPENCLAW_PATH/src/agents/ollama-models.ts"
+cp ./references/patches/ollama-stream.ts "$OPENCLAW_PATH/src/agents/ollama-stream.ts"
+cp ./references/patches/ollama-models.ts "$OPENCLAW_PATH/src/agents/ollama-models.ts"
+cp ./references/patches/config-utils.ts "$OPENCLAW_PATH/src/agents/config-utils.ts"
 
 # Create configuration file based on options
 echo "🔧 Creating configuration..."

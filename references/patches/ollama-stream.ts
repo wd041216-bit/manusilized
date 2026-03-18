@@ -18,6 +18,9 @@ import {
   buildUsageWithNoCost,
 } from "./stream-message-shared.js";
 
+// Import config utilities
+import { loadManusilizedConfig, applyStreamingMode, type ManusilizedConfig } from "./config-utils.js";
+
 const log = createSubsystemLogger("ollama-stream");
 
 export const OLLAMA_NATIVE_BASE_URL = OLLAMA_DEFAULT_BASE_URL;
@@ -393,11 +396,62 @@ const MARKDOWN_TOOL_CALL_RE =
   /```(?:json)?\s*\n?\s*\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*?\}\s*\n?```/g;
 
 // Additional patterns for better tool call detection
+// Additional patterns for better tool call detection
 const ADDITIONAL_TOOL_CALL_PATTERNS = [
+  /```(?:json)?\s*\n?\s*\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*?\}\s*\n?```/g,
   /```(?:json)?\s*\n?\s*\{[\s\S]*?"function"\s*:\s*\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*?\}\s*\n?```/g,
   /\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*?"arguments"\s*:\s*(\{[\s\S]*?\})[\s\S]*?\}/g,
   /<tool_call>([\s\S]*?)<\/tool_call>/g,
+  /```(?:ya?ml)\s*\n([\s\S]*?name:\s*[^\n]+[\s\S]*?arguments:\s*\{[\s\S]*?\})\s*\n```/g,
+  /(?:^|\n)(name:\s*[^\n]+\narguments:\s*\{[\s\S]*?\})(?=\n|$)/gm,
 ];
+
+/**
+ * Parse YAML-style tool call content
+ * @param yamlContent YAML formatted tool call string
+ * @returns Parsed tool call object
+ */
+function parseYamlToolCall(yamlContent: string): Record<string, unknown> {
+  const lines = yamlContent.trim().split('\n');
+  const result: Record<string, unknown> = {};
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('name:')) {
+      result.name = trimmed.substring(5).trim().replace(/^["']|["']$/g, '');
+    } else if (trimmed.startsWith('arguments:')) {
+      // Extract JSON portion after arguments:
+      const argsMatch = trimmed.match(/arguments:\s*(\{.*\})/);
+      if (argsMatch && argsMatch[1]) {
+        try {
+          result.arguments = JSON.parse(argsMatch[1]);
+        } catch {
+          // If JSON parsing fails, try to extract key-value pairs
+          const argsObj: Record<string, unknown> = {};
+          const argsLines = trimmed.substring(10).trim();
+          if (argsLines.startsWith('{') && argsLines.endsWith('}')) {
+            // Simplified JSON parsing for common cases
+            const keyValuePairs = argsLines.substring(1, argsLines.length - 1).split(',');
+            for (const pair of keyValuePairs) {
+              const [key, value] = pair.split(':').map(s => s.trim());
+              if (key && value) {
+                // Try to parse value as JSON or keep as string
+                try {
+                  argsObj[key.replace(/^["']|["']$/g, '')] = JSON.parse(value);
+                } catch {
+                  argsObj[key.replace(/^["']|["']$/g, '')] = value.replace(/^["']|["']$/g, '');
+                }
+              }
+            }
+            result.arguments = argsObj;
+          }
+        }
+      }
+    }
+  }
+  
+  return result;
+}
 
 export function extractMarkdownToolCalls(content: string): OllamaToolCall[] {
   const results: OllamaToolCall[] = [];
@@ -439,6 +493,10 @@ export function extractMarkdownToolCalls(content: string): OllamaToolCall[] {
           const name = match[1];
           const argsRaw = match[2];
           parsed = { name, arguments: JSON.parse(argsRaw) };
+        } else if (pattern.source.includes("ya?ml")) {
+          // Handle YAML format
+          const yamlContent = match[1] || match[0];
+          parsed = parseYamlToolCall(yamlContent);
         } else {
           // For patterns with single capture containing full JSON
           const raw = match[1] || match[0];
@@ -558,13 +616,45 @@ export function createOllamaStreamFn(
   baseUrl: string,
   defaultHeaders?: Record<string, string>,
   streamConfig?: StreamConfig,
+  configPath?: string,
 ): StreamFn {
+  // Load configuration from file if available
+  let baseConfig: ManusilizedConfig = {
+    streaming: {
+      mode: "standard",
+      bufferSize: 1024,
+      throttleDelay: 10,
+      enableThinkingOutput: false,
+      streamInterval: 50,
+    },
+    context: {
+      enableMegaContext: false,
+      maxContextWindow: 262144,
+      autoDetectContext: true,
+    },
+  };
+  
+  // Try to load config from file
+  try {
+    if (loadManusilizedConfig) {
+      const fileConfig = loadManusilizedConfig(configPath);
+      baseConfig = { ...baseConfig, ...fileConfig };
+    }
+  } catch (err) {
+    console.warn("[manusilized] Failed to load config file, using defaults:", err);
+  }
+  
+  // Apply streaming mode presets
+  if (applyStreamingMode) {
+    baseConfig = applyStreamingMode(baseConfig);
+  }
+  
   const chatUrl = resolveOllamaChatUrl(baseUrl);
   const config = {
-    bufferSize: 1024,
-    throttleDelay: 10,
-    enableThinkingOutput: false,
-    streamInterval: 50,
+    bufferSize: baseConfig.streaming?.bufferSize || 1024,
+    throttleDelay: baseConfig.streaming?.throttleDelay || 10,
+    enableThinkingOutput: baseConfig.streaming?.enableThinkingOutput || false,
+    streamInterval: baseConfig.streaming?.streamInterval || 50,
     ...streamConfig,
   };
 
@@ -647,51 +737,89 @@ export function createOllamaStreamFn(
           }),
         });
 
-        for await (const chunk of parseNdjsonStream(reader, config.bufferSize)) {
-          const currentTime = Date.now();
-          
-          // Throttle streaming to reduce UI updates
-          if (currentTime - lastStreamTime < config.throttleDelay) {
-            continue;
-          }
-          
-          // ── Real-time text_delta events (manusilized: incremental streaming) ──
-          // Emit each content fragment immediately so the UI can render a
-          // live typewriter effect instead of waiting for the full response.
-          if (chunk.message?.content) {
-            const delta = chunk.message.content;
-            accumulatedContent += delta;
-            stream.push({
-              type: "text_delta",
-              contentIndex,
-              delta,
-              partial: buildAssistantMessageWithZeroUsage({
-                model,
-                content: [{ type: "text", text: accumulatedContent }],
-                stopReason: "stop",
-              }),
-            });
+// Retry mechanism for stream parsing
+        let retryCount = 0;
+        const maxRetries = 3;
+        let connectionHealthy = true;
+        const connectionCheckInterval = 30000; // 30 seconds
+        let lastConnectionCheck = Date.now();
+        
+        while (retryCount <= maxRetries) {
+          try {
+            for await (const chunk of parseNdjsonStream(reader, config.bufferSize)) {
+              const currentTime = Date.now();
+              
+              // Check connection health periodically
+              if (currentTime - lastConnectionCheck > connectionCheckInterval) {
+                if (!navigator.onLine) {
+                  connectionHealthy = false;
+                  log.warn("[manusilized] Connection lost, attempting to recover...");
+                } else {
+                  connectionHealthy = true;
+                }
+                lastConnectionCheck = currentTime;
+              }
+              
+              // Throttle streaming to reduce UI updates
+              if (currentTime - lastStreamTime < config.throttleDelay) {
+                continue;
+              }
+              
+              // ── Real-time text_delta events (manusilized: incremental streaming) ──
+              // Emit each content fragment immediately so the UI can render a
+              // live typewriter effect instead of waiting for the full response.
+              if (chunk.message?.content) {
+                const delta = chunk.message.content;
+                accumulatedContent += delta;
+                stream.push({
+                  type: "text_delta",
+                  contentIndex,
+                  delta,
+                  partial: buildAssistantMessageWithZeroUsage({
+                    model,
+                    content: [{ type: "text", text: accumulatedContent }],
+                    stopReason: "stop",
+                  }),
+                });
+                
+                lastStreamTime = currentTime;
+              }
+
+              // Include thinking/reasoning output for enhanced experience
+              if (config.enableThinkingOutput && chunk.message?.thinking) {
+                stream.push({
+                  type: "thinking_delta",
+                  content: chunk.message.thinking,
+                });
+              }
+
+              // Ollama sends tool_calls in intermediate (done:false) chunks,
+              // NOT in the final done:true chunk. Collect from all chunks.
+              if (chunk.message?.tool_calls) {
+                accumulatedToolCalls.push(...chunk.message.tool_calls);
+              }
+
+              if (chunk.done) {
+                finalResponse = chunk;
+                break;
+              }
+            }
+            break; // Success, exit retry loop
+          } catch (err) {
+            retryCount++;
+            if (retryCount > maxRetries) {
+              throw err; // Re-throw if max retries exceeded
+            }
             
-            lastStreamTime = currentTime;
-          }
-
-          // Include thinking/reasoning output for enhanced experience
-          if (config.enableThinkingOutput && chunk.message?.thinking) {
-            stream.push({
-              type: "thinking_delta",
-              content: chunk.message.thinking,
-            });
-          }
-
-          // Ollama sends tool_calls in intermediate (done:false) chunks,
-          // NOT in the final done:true chunk. Collect from all chunks.
-          if (chunk.message?.tool_calls) {
-            accumulatedToolCalls.push(...chunk.message.tool_calls);
-          }
-
-          if (chunk.done) {
-            finalResponse = chunk;
-            break;
+            log.warn(`[manusilized] Stream parsing failed, retry ${retryCount}/${maxRetries}:`, err);
+            
+            // Wait before retry with exponential backoff
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+            
+            // Re-initialize the stream if possible
+            if (options?.signal?.aborted) {
+              throw new Error("Stream aborted by user");
+            }
           }
         }
 
@@ -700,6 +828,17 @@ export function createOllamaStreamFn(
         }
 
         finalResponse.message.content = accumulatedContent;
+
+        // Emit text_end event to indicate completion of text streaming
+        stream.push({
+          type: "text_end",
+          contentIndex,
+          partial: buildAssistantMessageWithZeroUsage({
+            model,
+            content: [{ type: "text", text: accumulatedContent }],
+            stopReason: "stop",
+          }),
+        });
 
         // ── Markdown tool-call fallback (manusilized: fault-tolerant adapter) ──
         // If the model produced no native tool_calls but embedded a JSON tool
@@ -718,6 +857,7 @@ export function createOllamaStreamFn(
               .replace(MARKDOWN_TOOL_CALL_RE, "")
               .replace(/```(?:json)?\s*\{[\s\S]*?\}\s*```/g, "")
               .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "")
+              .replace(/```(?:ya?ml)\s*\n[\s\S]*?\s*\n```/g, "")
               .trim();
           }
         }

@@ -13,7 +13,7 @@ Manusilized is a comprehensive enhancement package for OpenClaw that brings ente
 - **Connection health monitoring** and graceful recovery
 
 ### 2. Advanced Tool-Call Fallback System
-- **Multi-format tool call extraction** (JSON, YAML, XML-style)
+- **Multi-format tool call extraction** (JSON, YAML-like, XML-style)
 - **Fault-tolerant adapter** for models struggling with native JSON Function Calling
 - **Automatic cleanup** of raw JSON from visible content
 - **Enhanced error recovery** for malformed tool calls

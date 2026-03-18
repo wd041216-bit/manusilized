@@ -12,9 +12,11 @@
 
 ### 2. **Advanced Markdown Tool-Call Fallback (The "Amnesia" Cure)**
 - Fault-tolerant adapter that automatically detects, extracts, and corrects embedded tool calls
-- Support for multiple tool call formats (JSON, YAML, XML-style)
+- Support for multiple tool call formats (JSON, YAML-like, XML-style)
 - Enhanced regex patterns for better compatibility with various open-source models
 - Automatic cleanup of raw JSON from visible content
+- Retry mechanism for failed stream parsing with exponential backoff
+- Connection health monitoring with graceful recovery
 
 ### 3. **Extended Reasoning Model Support (2026 Ready)**
 - Natively recognizes and optimizes for the latest generation of reasoning models: 
