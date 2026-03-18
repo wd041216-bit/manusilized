@@ -398,7 +398,6 @@ const MARKDOWN_TOOL_CALL_RE =
 // Additional patterns for better tool call detection
 // Additional patterns for better tool call detection
 const ADDITIONAL_TOOL_CALL_PATTERNS = [
-  /```(?:json)?\s*\n?\s*\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*?\}\s*\n?```/g,
   /```(?:json)?\s*\n?\s*\{[\s\S]*?"function"\s*:\s*\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*?\}\s*\n?```/g,
   /\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*?"arguments"\s*:\s*(\{[\s\S]*?\})[\s\S]*?\}/g,
   /<tool_call>([\s\S]*?)<\/tool_call>/g,
@@ -565,9 +564,9 @@ export async function* parseNdjsonStream(
       // Reset buffer if we're done
       if (done && accumulatedBuffer.trim()) {
         try {
-          yield parseJsonPreservingUnsafeIntegers(accumBuffer.trim()) as OllamaChatResponse;
+          yield parseJsonPreservingUnsafeIntegers(accumulatedBuffer.trim()) as OllamaChatResponse;
         } catch {
-          log.warn(`Skipping malformed trailing data: ${accumulatedBuffer.trim().slice(0, 120)}`);
+          log.warn(`Skipping malformed trailing data: ${accumulatedBuffer.trim().slice(0, 120)`);
         }
       }
     }
@@ -749,40 +748,27 @@ export function createOllamaStreamFn(
             for await (const chunk of parseNdjsonStream(reader, config.bufferSize)) {
               const currentTime = Date.now();
               
-              // Check connection health periodically
-              if (currentTime - lastConnectionCheck > connectionCheckInterval) {
-                if (!navigator.onLine) {
-                  connectionHealthy = false;
-                  log.warn("[manusilized] Connection lost, attempting to recover...");
-                } else {
-                  connectionHealthy = true;
-                }
-                lastConnectionCheck = currentTime;
-              }
-              
-              // Throttle streaming to reduce UI updates
-              if (currentTime - lastStreamTime < config.throttleDelay) {
-                continue;
-              }
-              
               // ── Real-time text_delta events (manusilized: incremental streaming) ──
               // Emit each content fragment immediately so the UI can render a
               // live typewriter effect instead of waiting for the full response.
               if (chunk.message?.content) {
                 const delta = chunk.message.content;
                 accumulatedContent += delta;
-                stream.push({
-                  type: "text_delta",
-                  contentIndex,
-                  delta,
-                  partial: buildAssistantMessageWithZeroUsage({
-                    model,
-                    content: [{ type: "text", text: accumulatedContent }],
-                    stopReason: "stop",
-                  }),
-                });
-                
-                lastStreamTime = currentTime;
+                // Throttle streaming to reduce UI updates while still accumulating content
+                if (currentTime - lastStreamTime >= config.throttleDelay) {
+                  stream.push({
+                    type: "text_delta",
+                    contentIndex,
+                    delta,
+                    partial: buildAssistantMessageWithZeroUsage({
+                      model,
+                      content: [{ type: "text", text: accumulatedContent }],
+                      stopReason: "stop",
+                    }),
+                  });
+                  
+                  lastStreamTime = currentTime;
+                }
               }
 
               // Include thinking/reasoning output for enhanced experience

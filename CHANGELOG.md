@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-03-19
+
+### Fixed
+- Critical runtime error with undefined variable `accumulatedBuffer`
+- Node.js compatibility issue with `navigator.onLine` reference
+- Throttling mechanism that skipped content accumulation and tool calls
+- Duplicate tool call pattern in extraction regex patterns
+- Incorrect reasoning model heuristics for non-reasoning models
+
 ## [1.2.0] - 2026-03-18
 
 ### Added
