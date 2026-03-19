@@ -302,7 +302,7 @@ function detectLocalModel(model: OllamaTagModel): boolean {
  * reasoning models.  The list is intentionally broad to cover the rapidly
  * evolving open-source landscape (2025-2026).
  *
- * Patterns added by openstream:
+ * Patterns added by manusilized:
  *   - qwen3          (Qwen3 series – all variants have extended thinking)
  *   - qwq            (QwQ reasoning model family)
  *   - glm-?5 / glm5   (GLM-5 supports deep reasoning)
@@ -311,9 +311,21 @@ function detectLocalModel(model: OllamaTagModel): boolean {
  *   - skywork-o      (Skywork-o series)
  *   - llama.*reason  (Llama variants with reasoning capability)
  *   - yi.*1.5        (Yi 1.5 series reasoning models)
+ * 
+ * Excluded patterns (not reasoning models):
+ *   - deepseek-v3    (not a reasoning model)
+ *   - mistral.*large (not a reasoning model)
+ *   - command.*r     (not a reasoning model)
  */
 export function isReasoningModelHeuristic(modelId: string): boolean {
   const id = modelId.toLowerCase();
+  
+  // Exclude non-reasoning models
+  if (/deepseek-v3|mistral.*large|command.*r/i.test(id)) {
+    return false;
+  }
+  
+  // Check for reasoning model patterns
   return /r1|reasoning|think|reason|qwen3|qwq|glm-?5|kimi-?k2|marco-o|skywork-o|llama.*reason|yi.*1\.5/i.test(
     id,
   );
