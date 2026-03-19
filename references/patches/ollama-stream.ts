@@ -18,8 +18,73 @@ import {
   buildUsageWithNoCost,
 } from "./stream-message-shared.js";
 
+// ── Privacy Protection Filter ────────────────────────────────────────────────
+//
+// Filter out potentially sensitive information from content before processing
+// to ensure user privacy is maintained throughout the streaming process.
+
+/**
+ * Patterns for identifying potentially sensitive information
+ */
+const SENSITIVE_PATTERNS = [
+  // Personal identification
+  /\b\d{15,18}\b/g,                    // ID numbers (15-18 digits)
+  /\b\d{11}\b/g,                       // Phone numbers (11 digits)
+  /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,  // Email addresses
+  
+  // Financial information
+  /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,     // Credit card numbers
+  /\b\d{16}\b/g,                       // 16-digit card numbers
+  /\b[A-Z]{2}\d{10}[A-Z]?\b/g,        // IBAN numbers
+  
+  // Authentication credentials
+  /(password|passwd|pwd)["'`:\s]*[^\s"']+/gi,         // Password patterns
+  /(token|apikey|api_key)["'`:\s]*[^\s"']+/gi,       // Token patterns
+  /(secret|credential)["'`:\s]*[^\s"']+/gi,          // Secret patterns
+  
+  // Network information
+  /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g,         // IP addresses
+  /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g, // UUIDs
+];
+
+/**
+ * Filter sensitive information from content
+ * @param content The content to filter
+ * @returns Filtered content with sensitive information masked
+ */
+function filterSensitiveInformation(content: string): string {
+  let filteredContent = content;
+  
+  // Apply each sensitive pattern filter
+  for (const pattern of SENSITIVE_PATTERNS) {
+    filteredContent = filteredContent.replace(pattern, (match) => {
+      // Preserve the length of the match but mask the content
+      if (match.includes('@')) {
+        // Special handling for email addresses
+        const [localPart, domain] = match.split('@');
+        const maskedLocal = localPart.charAt(0) + '*'.repeat(Math.max(0, localPart.length - 2)) + 
+                          (localPart.length > 1 ? localPart.charAt(localPart.length - 1) : '');
+        return `${maskedLocal}@${domain}`;
+      } else if (/^\d+$/.test(match)) {
+        // For numeric sequences, partially mask
+        if (match.length >= 11) {
+          // Phone numbers or similar
+          return match.substring(0, 3) + '*'.repeat(Math.max(0, match.length - 6)) + match.substring(match.length - 3);
+        } else if (match.length >= 4) {
+          // General numbers
+          return match.substring(0, 2) + '*'.repeat(Math.max(0, match.length - 4)) + match.substring(match.length - 2);
+        }
+      }
+      // For other patterns, mask completely
+      return '*'.repeat(Math.min(match.length, 20)); // Limit mask length
+    });
+  }
+  
+  return filteredContent;
+}
+
 // Import config utilities
-import { loadOpenStreamConfig, applyStreamingMode, type OpenStreamConfig } from "./config-utils.js";
+import { loadManusilizedConfig, applyStreamingMode, type ManusilizedConfig } from "./config-utils.js";
 
 const log = createSubsystemLogger("ollama-stream");
 
@@ -405,9 +470,8 @@ function makeMarkdownToolCallRe(): RegExp {
   return /```(?:json)?\s*\n?\s*(\{(?:(?!```)\s|\S)*?"name"\s*:\s*"[^"]+"(?:(?!```)\s|\S)*?\})\s*\n?```/g;
 }
 
-// Additional patterns for better tool call detection
+// Additional patterns for better tool call detection (excluding duplicate of main pattern)
 const ADDITIONAL_TOOL_CALL_PATTERNS = [
-  /```(?:json)?\s*\n?\s*\{[\s\S]*?"function"\s*:\s*\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*?\}\s*\n?```/g,
   /\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*?"arguments"\s*:\s*(\{[\s\S]*?\})[\s\S]*?\}/g,
   /<tool_call>([\s\S]*?)<\/tool_call>/g,
   /```(?:ya?ml)\s*\n([\s\S]*?name:\s*[^\n]+[\s\S]*?arguments:\s*\{[\s\S]*?\})\s*\n```/g,
@@ -487,7 +551,7 @@ export function extractMarkdownToolCalls(
       // `{"name":"Alice","age":30}`) would be reclassified as a tool-use turn,
       // stripping the JSON from visible content and corrupting the conversation.
       if (allowedToolNames && !allowedToolNames.has(name)) {
-        log.debug(`[openstream] Skipping Markdown block: '${name}' is not a configured tool`);
+        log.debug(`[manusilized] Skipping Markdown block: '${name}' is not a configured tool`);
         continue;
       }
       const args =
@@ -498,7 +562,7 @@ export function extractMarkdownToolCalls(
             : {};
       results.push({ function: { name, arguments: args } });
     } catch {
-      log.warn(`[openstream] Failed to parse Markdown tool call: ${raw.slice(0, 120)}`);
+      log.warn(`[manusilized] Failed to parse Markdown tool call: ${raw.slice(0, 120)}`);
     }
   }
   
@@ -537,7 +601,7 @@ export function extractMarkdownToolCalls(
               
         results.push({ function: { name, arguments: args } });
       } catch (err) {
-        log.warn(`[openstream] Failed to parse additional tool call pattern: ${match[0].slice(0, 120)}`);
+        log.warn(`[manusilized] Failed to parse additional tool call pattern: ${match[0].slice(0, 120)}`);
       }
     }
   }
@@ -639,7 +703,7 @@ export function createOllamaStreamFn(
   configPath?: string,
 ): StreamFn {
   // Load configuration from file if available
-  let baseConfig: OpenStreamConfig = {
+  let baseConfig: ManusilizedConfig = {
     streaming: {
       mode: "standard",
       bufferSize: 1024,
@@ -656,12 +720,12 @@ export function createOllamaStreamFn(
   
   // Try to load config from file
   try {
-    if (loadOpenStreamConfig) {
-      const fileConfig = loadOpenStreamConfig(configPath);
+    if (loadManusilizedConfig) {
+      const fileConfig = loadManusilizedConfig(configPath);
       baseConfig = { ...baseConfig, ...fileConfig };
     }
   } catch (err) {
-    console.warn("[openstream] Failed to load config file, using defaults:", err);
+    console.warn("[manusilized] Failed to load config file, using defaults:", err);
   }
   
   // Apply streaming mode presets
@@ -769,11 +833,13 @@ export function createOllamaStreamFn(
             for await (const chunk of parseNdjsonStream(reader, config.bufferSize)) {
               const currentTime = Date.now();
               
-              // ── Real-time text_delta events (openstream: incremental streaming) ──
+              // ── Real-time text_delta events (manusilized: incremental streaming) ──
               // Emit each content fragment immediately so the UI can render a
               // live typewriter effect instead of waiting for the full response.
               if (chunk.message?.content) {
-                const delta = chunk.message.content;
+                // Apply privacy filter to content before processing
+                const filteredDelta = filterSensitiveInformation(chunk.message.content);
+                const delta = filteredDelta;
                 accumulatedContent += delta;
                 // Throttle streaming to reduce UI updates while still accumulating content
                 if (currentTime - lastStreamTime >= config.throttleDelay) {
@@ -818,7 +884,7 @@ export function createOllamaStreamFn(
               throw err; // Re-throw if max retries exceeded
             }
             
-            log.warn(`[openstream] Stream parsing failed, retry ${retryCount}/${maxRetries}:`, err);
+            log.warn(`[manusilized] Stream parsing failed, retry ${retryCount}/${maxRetries}:`, err);
             
             // Wait before retry with exponential backoff
             await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
@@ -834,7 +900,8 @@ export function createOllamaStreamFn(
           throw new Error("Ollama API stream ended without a final response");
         }
 
-        finalResponse.message.content = accumulatedContent;
+        // Apply privacy filter to final content
+        finalResponse.message.content = filterSensitiveInformation(accumulatedContent);
 
         // Emit text_end event to indicate completion of text streaming
         stream.push({
@@ -847,13 +914,13 @@ export function createOllamaStreamFn(
           }),
         });
 
-        // ── Markdown tool-call fallback (openstream: fault-tolerant adapter) ──
+        // ── Markdown tool-call fallback (manusilized: fault-tolerant adapter) ──
         // If the model produced no native tool_calls but embedded a JSON tool
         // call inside a fenced code block, extract it as a fallback so that
         // open-source models that don't support structured output still work.
         if (accumulatedToolCalls.length === 0 && accumulatedContent) {
           // Pass the configured tool names so random JSON objects with a
-          // `name` field are not misidentified as tool calls (openstream fix).
+          // `name` field are not misidentified as tool calls (manusilized fix).
           const allowedNames = ollamaTools
             ? new Set(ollamaTools.map((t: { function?: { name?: string }; name?: string }) =>
                 typeof t.function?.name === "string" ? t.function.name :
@@ -863,17 +930,20 @@ export function createOllamaStreamFn(
           const markdownCalls = extractMarkdownToolCalls(accumulatedContent, allowedNames);
           if (markdownCalls.length > 0) {
             log.debug(
-              `[openstream] Extracted ${markdownCalls.length} tool call(s) from Markdown fallback`,
+              `[manusilized] Extracted ${markdownCalls.length} tool call(s) from Markdown fallback`,
             );
             accumulatedToolCalls.push(...markdownCalls);
             // Strip the tool-call JSON blocks from the visible content so the
             // user doesn't see raw JSON in the chat bubble.
             // Use the factory regex for a fresh instance (no shared lastIndex)
-            finalResponse.message.content = accumulatedContent
+            let cleanedContent = accumulatedContent
               .replace(makeMarkdownToolCallRe(), "")
               .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "")
               .replace(/```(?:ya?ml)\s*\n[\s\S]*?\s*\n```/g, "")
               .trim();
+            
+            // Apply privacy filter to cleaned content
+            finalResponse.message.content = filterSensitiveInformation(cleanedContent);
           }
         }
 
