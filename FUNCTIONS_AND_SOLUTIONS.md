@@ -1,8 +1,10 @@
 # OpenStream: Core Architecture Upgrades for OpenClaw
 
+> Historical solution note. This document captures the intended change surface and earlier positioning language. For the current maintainer-facing status and evidence bar, start with [README.md](README.md), [docs/architecture.md](docs/architecture.md), and [docs/why-core.md](docs/why-core.md).
+
 ## 🎯 Overview
 
-OpenStream is a comprehensive enhancement package for OpenClaw that delivers enterprise-grade reliability and silky-smooth streaming experiences to open-source models. It solves critical pain points in streaming, tool calling, and context management.
+OpenStream is a proposed enhancement package for OpenClaw focused on streaming behavior, tool-call fallback, and context heuristics for open-source models.
 
 ## 🔧 Key Functions
 

@@ -1,79 +1,37 @@
-# OpenStream Submission Checklist
+# OpenStream Acceptance Checklist
 
-## 📋 Repositories to Submit To
+This checklist tracks the path to eventual OpenClaw inclusion.
 
-### 1. OpenClaw Core (Priority 1)
-- [x] Issue created: https://github.com/openclaw/openclaw/issues/49728
-- [ ] PR to be created manually when network is stable
-- Files to include:
-  - `references/patches/ollama-stream.ts`
-  - `references/patches/ollama-models.ts`
-  - `install-patch.sh`
+## Track A: OpenClaw Core PR
 
-### 2. ClawHub (Priority 1)
-- [x] Issue created: https://github.com/openclaw/clawhub/issues/1011
-- [ ] Skill submission to be completed manually
-- Files to include:
-  - Full repository contents
+- [ ] Pin the proposal to a specific OpenClaw revision
+- [ ] Reduce the patch surface to the minimum required runtime changes
+- [ ] Add automated tests for:
+  - [ ] streaming assembly
+  - [ ] malformed tool-call fallback
+  - [ ] context-window heuristics
+- [ ] Add at least one reproducible validation fixture or transcript
+- [ ] Replace unsupported performance claims with measured results
+- [ ] Rewrite PR description for maintainer review
 
-### 3. LeoYeAI/openclaw-master-skills (Priority 2)
-- [ ] Issue/PR to be created manually
-- This is a popular skill collection that would benefit many users
+## Track B: Plugin Feasibility
 
-### 4. Azure-Samples/python-ai-agent-frameworks-demos (Priority 3)
-- [ ] Issue/PR to be created manually
-- Good exposure to Microsoft developer community
+- [ ] Identify which behaviors can move behind plugin hooks or provider wrappers
+- [ ] Prototype a non-destructive install path
+- [ ] Confirm whether OpenClaw plugin APIs can host the streaming and fallback behavior
+- [ ] Compare core PR and plugin maintenance cost
 
-## 📝 Manual Submission Steps
+## Track C: ClawHub Eligibility
 
-### For OpenClaw Core PR:
-1. Navigate to https://github.com/openclaw/openclaw
-2. Fork the repository (if not already done)
-3. Clone your fork locally
-4. Create a new branch: `feature/openstream-enhancements`
-5. Replace the files:
-   - `src/agents/ollama-stream.ts`
-   - `src/agents/ollama-models.ts`
-6. Commit with message: "feat: Enhance OpenClaw with OpenStream - 2M Context + Advanced Streaming"
-7. Push to your fork
-8. Create Pull Request with the content from `PR_DESCRIPTION.md`
+Only revisit this track if OpenStream becomes:
 
-### For ClawHub Submission:
-1. Navigate to https://github.com/openclaw/clawhub
-2. Follow their submission guidelines
-3. Include the content from `CLAWHUB_SUBMISSION.md`
-4. Upload the complete skill package
+- a real plugin package
+or
+- a companion skill that documents and configures an already accepted runtime capability
 
-## 📦 Files to Include in All Submissions
+Before any ClawHub submission:
 
-```
-openstream/
-├── CHANGELOG.md
-├── FUNCTIONS_AND_SOLUTIONS.md
-├── README.md
-├── UPGRADE_PLAN.md
-├── install-patch.sh
-├── package.json
-├── references/
-│   └── patches/
-│       ├── ollama-models.ts
-│       └── ollama-stream.ts
-├── test-openstream.sh
-├── PR_DESCRIPTION.md
-└── CLAWHUB_SUBMISSION.md
-```
-
-## 🎯 Key Selling Points
-
-1. **2M Context Window Support** - 16x improvement over current limitations
-2. **Enhanced Streaming** - Manus-like silky smooth experience
-3. **Improved Tool Calling** - 95% success rate with fault-tolerant adapter
-4. **Next-Gen Model Support** - Optimized for 2026-era reasoning models
-5. **Backward Compatible** - Drop-in enhancement with no breaking changes
-
-## 📞 Follow-up Actions
-
-- Monitor the created issues for maintainer feedback
-- Prepare responses to potential questions about implementation details
-- Be ready to provide additional benchmarks or usage examples
-- Consider creating a demo video showing the enhancements in action
+- [ ] stable install surface exists
+- [ ] security/rollback story is documented
+- [ ] public docs match the real package shape
+- [ ] validation goes beyond repository self-checks

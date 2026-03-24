@@ -1,146 +1,131 @@
-# OpenStream: Smooth Streaming for OpenClaw
+# OpenStream
 
-**OpenStream** is a comprehensive enhancement for your OpenClaw agent, delivering enterprise-grade reliability and silky-smooth streaming experiences to open-source models (like Qwen, GLM, DeepSeek).
+OpenStream is a maintainer-facing patch set for proposed OpenClaw Ollama runtime improvements.
 
-## 🌟 Key Features
+It focuses on three concrete areas:
 
-### 1. **Enhanced Incremental Streaming (Silky Smooth Experience)**
-- Real-time `text_delta` streaming for Ollama models with configurable parameters
-- Live typewriter effect, perfectly mirroring the behavior of closed-source giants
-- Configurable streaming modes: standard, enhanced, and ultra for different performance needs
-- Support for thinking/reasoning output visualization
+- smoother incremental streaming for Ollama-backed responses
+- stronger fallback extraction when open-source models emit tool calls as markdown or malformed JSON
+- broader context-window and reasoning-model heuristics for newer open-source models
 
-### 2. **Advanced Markdown Tool-Call Fallback (The "Amnesia" Cure)**
-- Fault-tolerant adapter that automatically detects, extracts, and corrects embedded tool calls
-- Support for multiple tool call formats (JSON, YAML-like, XML-style)
-- Enhanced regex patterns for better compatibility with various open-source models
-- Automatic cleanup of raw JSON from visible content
-- Retry mechanism for failed stream parsing with exponential backoff
-- Connection health monitoring with graceful recovery
+## Current Status
 
-### 3. **Extended Reasoning Model Support (2026 Ready)**
-- Natively recognizes and optimizes for the latest generation of reasoning models: 
-  - `qwen3`, `qwq`, `glm-5`, `kimi-k2.5`, `deepseek-v3`, `marco-o1`, and `skywork-o`
-- Specialized handling for reasoning tasks with enhanced performance
-- Automatic detection of reasoning capabilities in models
+OpenStream is **not** a standard OpenClaw skill today.
 
-### 4. **Mega Context Window Support (Up to 2M Tokens)**
-- Intelligent context window detection with caching
-- Support for extended context windows up to 2 million tokens
-- Predefined context windows for popular models
-- Dynamic adjustment based on model capabilities
-- Memory-efficient handling of large contexts
+The current repository contains:
 
-## 🚀 Performance Improvements
+- patch files that replace parts of the OpenClaw Ollama runtime
+- a helper installer for local evaluation
+- lightweight validation scripts
+- maintainer notes for a future OpenClaw core PR or plugin rewrite
 
-### Streaming Enhancements
-- Configurable buffer sizes for smoother output
-- Throttling controls to reduce UI updates
-- Connection health monitoring and recovery
-- Enhanced error handling and graceful degradation
+The current product shape is therefore:
 
-### Tool Call Reliability
-- Multiple extraction patterns for maximum compatibility
-- Retry mechanisms for failed extractions
-- Detailed logging for troubleshooting
-- Better error recovery for malformed tool calls
+- suitable for evaluating a core PR direction
+- not yet suitable for ClawHub submission
+- not yet packaged as an OpenClaw plugin
 
-### Context Management
-- Smart caching for context window detection
-- Memory-efficient handling of large contexts
-- Dynamic context resizing based on model capabilities
-- Support for both local and remote models
+If the long-term goal is official OpenClaw inclusion, the most credible path is:
 
-## 🛠️ Installation & Setup
+1. prove the runtime changes with tests and reproducible validation
+2. submit the smallest viable core PR
+3. evaluate whether the remaining behavior can move into a plugin
 
-Since OpenStream modifies the core `agents` architecture of OpenClaw, it cannot be installed merely as a standard skill folder.
+Details:
 
-### Option 1: The Official PR (Recommended)
-We have submitted these upgrades as a core PR to the OpenClaw repository.
-👉 **[View and Upvote the PR on GitHub](https://github.com/openclaw/openclaw/pulls)**
+- [docs/architecture.md](docs/architecture.md)
+- [docs/why-core.md](docs/why-core.md)
 
-### Option 2: Manual Patch
-If you want to experience OpenStream immediately before the PR is merged, you can apply our patch directly to your OpenClaw installation:
+## What Changes
 
-1. Clone the OpenClaw repository.
-2. Download the OpenStream patch files from our [GitHub repository](https://github.com/openstream/openstream).
-3. Replace the corresponding files in `src/agents/` (`ollama-stream.ts` and `ollama-models.ts`).
-4. Rebuild OpenClaw.
+The current patch set touches the Ollama runtime behavior rather than task-level skills.
 
-### Advanced Installation Options
+Primary areas:
+
+- `references/patches/ollama-stream.ts`
+  improves streaming assembly and fallback handling for malformed tool-call output
+- `references/patches/ollama-models.ts`
+  extends model heuristics and context-window detection
+- `references/patches/config-utils.ts`
+  adds config loading used by the patch installer flow
+
+These are runtime concerns, which is why this repo should be judged as a core/platform proposal first, not as a skill bundle.
+
+## Repository Layout
+
+- [references/patches/](references/patches/)
+  canonical patch files under evaluation
+- [install-patch.sh](install-patch.sh)
+  local helper that copies the patch files into an OpenClaw checkout
+- [test-openstream.sh](test-openstream.sh)
+  lightweight repository validation
+- [docs/architecture.md](docs/architecture.md)
+  system boundaries and change surface
+- [docs/why-core.md](docs/why-core.md)
+  rationale for core-first packaging
+- [PR_DESCRIPTION.md](PR_DESCRIPTION.md)
+  maintainer-facing PR draft
+
+## Evaluation Flow
+
+Use this repo when you want to inspect or trial the proposed runtime behavior in a local OpenClaw checkout.
+
+### 1. Validate the repository contents
 
 ```bash
-# Standard installation
+bash ./test-openstream.sh
+```
+
+### 2. Apply the patch to an OpenClaw checkout
+
+```bash
 ./install-patch.sh /path/to/openclaw
+```
 
-# Enable 2M context window support
+Optional flags:
+
+```bash
 ./install-patch.sh --enable-mega-context /path/to/openclaw
-
-# Use enhanced streaming mode
 ./install-patch.sh --streaming-mode enhanced /path/to/openclaw
-
-# Combine options
-./install-patch.sh --enable-mega-context --streaming-mode ultra /path/to/openclaw
 ```
 
-## ⚙️ Configuration
+### 3. Rebuild OpenClaw
 
-OpenStream generates a configuration file at `config/openstream-streaming.json` with the following options:
-
-```json
-{
-  "streaming": {
-    "mode": "enhanced",
-    "bufferSize": 2048,
-    "throttleDelay": 5,
-    "enableThinkingOutput": true,
-    "streamInterval": 25
-  },
-  "context": {
-    "enableMegaContext": true,
-    "maxContextWindow": 2097152,
-    "autoDetectContext": true
-  }
-}
+```bash
+cd /path/to/openclaw
+pnpm build
 ```
 
-## 📊 Benchmark Results
+### 4. Manually verify behavior
 
-| Feature | Before | After | Improvement |
-|---------|--------|-------|-------------|
-| Streaming Smoothness | 6/10 | 9/10 | 50% better |
-| Tool Call Success Rate | 75% | 95% | 26% increase |
-| Context Window Support | 128K | 2M | 16x increase |
-| Error Recovery | Basic | Advanced | Significant |
+Suggested checks:
 
-## 🧪 Supported Models
+- confirm streaming emits partial output smoothly for Ollama-backed responses
+- confirm malformed markdown/json tool calls are either recovered or surfaced cleanly
+- confirm larger context heuristics are applied only to intended model families
+- compare behavior against an unpatched baseline on the same OpenClaw revision
 
-OpenStream has been tested with the following models:
-- Qwen3 series (4B, 8B, 32B, 72B, 110B)
-- GLM-5 series
-- DeepSeek V3
-- Kimi K2.5
-- Llama 3.1 series
-- Mistral Large
-- Yi 1.5 series
+## Important Limits
 
-## 📈 Performance Considerations
+This repo is intentionally conservative about claims at this stage.
 
-- **Memory Usage**: Increased context support requires more RAM
-- **CPU Usage**: Enhanced streaming may increase CPU usage by 10-15%
-- **Network**: Recommended minimum 100Mbps connection for large context models
-- **Storage**: SSD recommended for optimal performance with large models
+- It does **not** yet include reproducible benchmark data for the percentages previously claimed.
+- It does **not** yet include automated integration tests against a pinned OpenClaw revision.
+- It does **not** yet offer a plugin package or a ClawHub-ready artifact.
+- It currently depends on replacing upstream files, which is a temporary evaluation model rather than a preferred long-term distribution model.
 
-## 📝 License
+## What Would Make This Collectable by OpenClaw
 
-MIT License
+OpenClaw maintainers will likely need:
 
-## 🙏 Acknowledgments
+- a pinned compatibility target against a specific OpenClaw revision
+- real automated tests for streaming, fallback extraction, and model heuristics
+- a narrower PR surface than "general runtime supercharger" framing
+- evidence-backed benchmarks or replay fixtures
+- a clear answer to whether the final shape belongs in core or in a plugin
 
-- Thanks to the Manus AI team for their innovative approach to AI agent interfaces
-- Thanks to the OpenClaw community for their continuous feedback and support
-- Special thanks to open-source model developers pushing the boundaries of what's possible
+This repository is now optimized around that maintainer review path rather than around direct skill submission.
 
-## 📣 Feedback
+## License
 
-We welcome feedback and contributions! Please open an issue or submit a pull request with your suggestions.
+MIT

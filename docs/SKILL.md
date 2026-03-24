@@ -1,39 +1,26 @@
-# OpenStream: The OpenClaw Supercharger
+# OpenStream Packaging Note
 
-**OpenStream** is not just a skill; it's a comprehensive upgrade for your OpenClaw agent, bringing enterprise-grade reliability and a "Manus-like" silky-smooth experience to open-source models (like Qwen, GLM, DeepSeek).
+OpenStream is **not currently a standard OpenClaw skill**.
 
-## 🌟 Key Features
+This repository contains runtime patch files for proposed OpenClaw Ollama improvements:
 
-1. **Incremental Streaming (Silky Smooth Experience)**
-   - No more staring at a blank screen while reasoning models think! OpenStream introduces real-time `text_delta` streaming for Ollama models.
-   - You get a live typewriter effect, perfectly mirroring the behavior of closed-source giants.
+- smoother incremental streaming
+- better fallback recovery for malformed tool-call output
+- broader context-window and reasoning-model heuristics
 
-2. **Markdown Tool-Call Fallback (The "Amnesia" Cure)**
-   - Open-source models often struggle with native JSON Function Calling, outputting tool calls embedded within Markdown code blocks.
-   - OpenStream includes a fault-tolerant adapter that automatically detects, extracts, and corrects these embedded tool calls, drastically improving success rates.
+Those changes target OpenClaw core behavior, not a task-level skill surface.
 
-3. **Extended Reasoning Model Support (2026 Ready)**
-   - Natively recognizes and optimizes for the latest generation of reasoning models: `qwen3`, `qwq`, `glm-5`, `kimi-k2.5`, `deepseek-v3`, `marco-o1`, and `skywork-o`.
+## Current Recommendation
 
-## 🛠️ Installation & Setup
+Treat this repository as one of the following:
 
-Since OpenStream modifies the core `agents` architecture of OpenClaw, it cannot be installed merely as a standard skill folder.
+- a maintainer-facing core PR preparation repo
+- a future plugin candidate, if the runtime behavior can be exposed through stable OpenClaw extension points
 
-### Option 1: The Official PR (Recommended)
-We have submitted these upgrades as a core PR to the OpenClaw repository.
-👉 **[View and Upvote the PR on GitHub](https://github.com/openclaw/openclaw/pulls)**
+Do **not** submit the current repository contents to ClawHub as a normal skill bundle.
 
-### Option 2: Manual Patch
-If you want to experience OpenStream immediately before the PR is merged, you can apply our patch directly to your OpenClaw installation:
+For the current rationale and acceptance path, see:
 
-1. Clone the OpenClaw repository.
-2. Download the OpenStream patch files from our [GitHub repository](https://github.com/openstream/openstream).
-3. Replace the corresponding files in `src/agents/` (`ollama-stream.ts` and `ollama-models.ts`).
-4. Rebuild OpenClaw.
-
-## 💡 Why OpenStream?
-
-Our mission is to democratize the "perfect agent" experience. By bridging the gap between open-source models and enterprise frameworks, OpenStream ensures that anyone can run a top-tier AI agent locally or in the cloud without relying on expensive API keys.
-
----
-*Created by Manus AI.*
+- [README.md](../README.md)
+- [architecture.md](architecture.md)
+- [why-core.md](why-core.md)

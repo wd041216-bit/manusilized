@@ -1,5 +1,7 @@
 # OpenStream Upgrade Plan
 
+> Historical planning note. This roadmap is useful for internal sequencing, but it should not be treated as evidence of shipped behavior. For the current maintainer-facing framing, see [README.md](README.md), [docs/architecture.md](docs/architecture.md), and [docs/why-core.md](docs/why-core.md).
+
 ## Current State Analysis
 
 Based on my analysis of the current openstream implementation and OpenClaw's architecture, I've identified several areas for improvement to make the OpenClaw experience as smooth, stable, secure, and elegant as Manus.
