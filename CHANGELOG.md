@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Native OpenClaw companion plugin packaging via `openclaw.plugin.json`, `index.ts`, and plugin-shipped skills
+- `/openstream` command, `openstream_doctor` tool, and cached prompt guidance for Ollama/open-source model deployments
+- `docs/plugin-mode.md` to explain the new plugin-companion plus core-bridge split
+
+### Changed
+- Repositioned the repository from patch-only proposal to plugin companion plus maintainer runtime bridge
+- Upgraded `package.json` to look like a real OpenClaw extension package
+- Extended repository validation to verify plugin files and hook surfaces
+
 ## [1.3.2] - 2026-03-19
 
 ### Changed

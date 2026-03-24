@@ -1,8 +1,8 @@
 {
-  "name": "openstream",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Maintainer-facing patch set and validation scripts for proposed OpenClaw Ollama runtime enhancements.",
+  "name": "@wd041216-bit/openstream",
+  "version": "1.1.0",
+  "description": "OpenClaw companion plugin and core bridge for stronger Ollama diagnostics, prompt guidance, and runtime enhancement proposals.",
+  "type": "module",
   "scripts": {
     "validate": "bash ./test-openstream.sh",
     "test": "npm run validate"
@@ -12,8 +12,23 @@
     "ollama",
     "streaming",
     "runtime",
-    "patches"
+    "patches",
+    "plugin",
+    "heuristics"
   ],
   "author": "wd041216-bit",
-  "license": "MIT"
+  "license": "MIT",
+  "peerDependencies": {
+    "openclaw": ">=2026.3.13"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
 }

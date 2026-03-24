@@ -1,6 +1,11 @@
 # Why Core First
 
-OpenStream currently starts as a core-first proposal because the repository changes OpenClaw runtime behavior directly.
+OpenStream started as a core-first proposal because the repository changed OpenClaw runtime behavior directly.
+
+That is no longer the whole story:
+
+- a companion plugin is now viable and implemented
+- the deepest runtime parser/streaming behavior is still core-first
 
 ## Reasons
 
@@ -27,21 +32,34 @@ ClawHub is a strong fit for:
 
 OpenStream currently offers:
 
+- a native plugin companion
 - file replacement patches
 - installer scripts
 - maintainer notes
 
 That is not yet a trustworthy marketplace artifact.
 
-## What Could Make Plugin Packaging Viable Later
+## What Has Become Plugin-Viable Already
 
-If OpenClaw exposes stable extension points for:
+OpenClaw now exposes enough plugin surface for OpenStream to ship:
 
-- provider wrappers
+- command helpers
+- agent tools
+- plugin-shipped skills
+- cached prompt guidance
+- config generation and heuristic diagnostics
+
+Those parts should live in plugin space now.
+
+## What Still Needs Core Or New Provider Hooks
+
+The remaining hard parts still need either core review or better provider hooks for:
+
 - stream hooks
 - model metadata augmentation
-- config registration
+- provider-owned repair wrappers for brittle tool-call streams
 
-then OpenStream should be re-evaluated as a plugin.
+Until those are available, the honest product shape is:
 
-Until then, core review is the more honest product shape.
+- plugin companion for installable, collectable value
+- core bridge for the remaining deep runtime behavior

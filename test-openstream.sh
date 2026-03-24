@@ -83,7 +83,7 @@ fi
 
 echo "5. Documentation completeness"
 
-REQUIRED_DOCS=("README.md" "CHANGELOG.md" "docs/architecture.md" "docs/why-core.md")
+REQUIRED_DOCS=("README.md" "CHANGELOG.md" "docs/architecture.md" "docs/why-core.md" "docs/plugin-mode.md")
 for doc in "${REQUIRED_DOCS[@]}"; do
   if [ -f "$doc" ]; then
     echo "PASS: $doc found"
@@ -93,10 +93,44 @@ for doc in "${REQUIRED_DOCS[@]}"; do
   fi
 done
 
+echo "6. Plugin packaging"
+
+REQUIRED_PLUGIN_FILES=("openclaw.plugin.json" "index.ts" "runtime-api.ts" "skills/openstream/SKILL.md")
+for file in "${REQUIRED_PLUGIN_FILES[@]}"; do
+  if [ -f "$file" ]; then
+    echo "PASS: $file found"
+  else
+    echo "FAIL: $file missing"
+    exit 1
+  fi
+done
+
+if grep -q '"id": "openstream"' "openclaw.plugin.json"; then
+  echo "PASS: openclaw.plugin.json declares the OpenStream plugin id"
+else
+  echo "FAIL: openclaw.plugin.json does not declare plugin id"
+  exit 1
+fi
+
+if grep -q '"extensions"' "package.json" && grep -q '"type": "module"' "package.json"; then
+  echo "PASS: package.json advertises an OpenClaw extension entry"
+else
+  echo "FAIL: package.json missing OpenClaw extension metadata"
+  exit 1
+fi
+
+if grep -q 'registerCommand' "index.ts" && grep -q 'registerTool' "index.ts" && grep -q 'before_prompt_build' "index.ts"; then
+  echo "PASS: index.ts registers command, tool, and prompt guidance hook"
+else
+  echo "FAIL: index.ts missing expected plugin surfaces"
+  exit 1
+fi
+
 echo ""
 echo "Summary"
 echo "======="
 echo "Repository-level validation passed."
+echo "OpenStream now ships both plugin-companion and runtime-bridge assets."
 echo "This script does not replace integration testing against a pinned OpenClaw revision."
 
 exit 0
